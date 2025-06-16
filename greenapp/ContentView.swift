@@ -1,86 +1,104 @@
-//
-//  ContentView.swift
-//  greenapp
-//
-//  Created by Otsar on 16/06/2025.
-//
-
 import SwiftUI
-import CoreData
+
+struct Plant: Identifiable, Hashable {
+    let id = UUID()
+    let name: String
+}
+
+private let plantOptions = [
+    "Wheat",
+    "Barley",
+    "Grape",
+    "Fig",
+    "Pomegranate",
+    "Olive",
+    "Date"
+]
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
+    @State private var grid: [Plant?] = Array(repeating: nil, count: 9)
+    @State private var isEditing = false
+    @State private var showAddSheet = false
+    @State private var plantToAdd: Plant? = nil
 
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+        VStack(spacing: 20) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 16) {
+                ForEach(grid.indices, id: \.self) { index in
+                    ZStack {
+                        Rectangle()
+                            .stroke(Color.gray, style: StrokeStyle(lineWidth: 2, dash: isEditing && grid[index] == nil && plantToAdd != nil ? [5] : []))
+                            .frame(height: 80)
+                        if let plant = grid[index] {
+                            Text(plant.name)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if isEditing && plantToAdd != nil {
+                            Image(systemName: "plus")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .onTapGesture {
+                        guard isEditing else { return }
+                        if let newPlant = plantToAdd {
+                            grid[index] = newPlant
+                            plantToAdd = nil
+                        } else {
+                            grid[index] = nil
+                        }
                     }
                 }
-                .onDelete(perform: deleteItems)
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+            .animation(.default, value: grid)
+
+            HStack {
+                Button(isEditing ? "Exit Edit Mode" : "Edit Mode") {
+                    isEditing.toggle()
+                    plantToAdd = nil
+                    showAddSheet = false
                 }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                Spacer()
+                Button("Add Plant") {
+                    showAddSheet = true
+                    isEditing = true
+                }
+                .popover(isPresented: $showAddSheet) {
+                    PlantPicker { plant in
+                        plantToAdd = plant
+                        showAddSheet = false
                     }
                 }
             }
-            Text("Select an item")
+            .padding(.horizontal)
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
+        .padding()
     }
 }
 
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
+struct PlantPicker: View {
+    var onSelect: (Plant) -> Void
+    @State private var searchText = ""
+
+    private var filtered: [String] {
+        guard !searchText.isEmpty else { return plantOptions }
+        return plantOptions.filter { $0.lowercased().contains(searchText.lowercased()) }
+    }
+
+    var body: some View {
+        VStack {
+            TextField("Search", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .padding()
+            List(filtered, id: \.self) { name in
+                Button(name) {
+                    onSelect(Plant(name: name))
+                }
+            }
+            .listStyle(.plain)
+        }
+        .frame(width: 250, height: 300)
+    }
+}
 
 #Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    ContentView()
 }
