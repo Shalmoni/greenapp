@@ -6,13 +6,7 @@ struct Plant: Identifiable, Hashable {
 }
 
 private let plantOptions = [
-    "Wheat",
-    "Barley",
-    "Grape",
-    "Fig",
-    "Pomegranate",
-    "Olive",
-    "Date"
+    "Wheat", "Barley", "Grape", "Fig", "Pomegranate", "Olive", "Date"
 ]
 
 struct ContentView: View {
@@ -20,57 +14,116 @@ struct ContentView: View {
     @State private var isEditing = false
     @State private var showAddSheet = false
     @State private var plantToAdd: Plant? = nil
+    @State private var movingPlantIndex: Int? = nil
 
     var body: some View {
         VStack(spacing: 20) {
+            // Garden Grid
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 16) {
                 ForEach(grid.indices, id: \.self) { index in
                     ZStack {
                         Rectangle()
-                            .stroke(Color.gray, style: StrokeStyle(lineWidth: 2, dash: isEditing && grid[index] == nil && plantToAdd != nil ? [5] : []))
+                            .stroke(Color.gray, style: StrokeStyle(lineWidth: 2, dash: isEditing && grid[index] == nil && (plantToAdd != nil || movingPlantIndex != nil) ? [5] : []))
                             .frame(height: 80)
+
                         if let plant = grid[index] {
                             Text(plant.name)
+                                .foregroundColor(movingPlantIndex == index ? .gray : .primary)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if isEditing && plantToAdd != nil {
+                        } else if isEditing && (plantToAdd != nil || movingPlantIndex != nil) {
                             Image(systemName: "plus")
                                 .foregroundColor(.gray)
                         }
                     }
                     .onTapGesture {
                         guard isEditing else { return }
-                        if let newPlant = plantToAdd {
+
+                        // Deselect
+                        if movingPlantIndex == index {
+                            movingPlantIndex = nil
+                            return
+                        }
+
+                        // Move
+                        if let selected = movingPlantIndex {
+                            if grid[index] == nil {
+                                grid[index] = grid[selected]
+                                grid[selected] = nil
+                                movingPlantIndex = nil
+                            }
+                            return
+                        }
+
+                        // Add
+                        if let newPlant = plantToAdd, grid[index] == nil {
                             grid[index] = newPlant
                             plantToAdd = nil
-                        } else {
-                            grid[index] = nil
+                            return
+                        }
+
+                        // Select for move
+                        if grid[index] != nil {
+                            movingPlantIndex = index
+                            plantToAdd = nil
                         }
                     }
                 }
             }
             .animation(.default, value: grid)
 
+            // Controls
             HStack {
-                Button(isEditing ? "Exit Edit Mode" : "Edit Mode") {
-                    isEditing.toggle()
-                    plantToAdd = nil
-                    showAddSheet = false
-                }
-                Spacer()
                 Button("Add Plant") {
                     showAddSheet = true
                     isEditing = true
+                    movingPlantIndex = nil
                 }
-                .popover(isPresented: $showAddSheet) {
-                    PlantPicker { plant in
-                        plantToAdd = plant
-                        showAddSheet = false
-                    }
+                Spacer()
+                Button(isEditing ? "Exit Edit Mode" : "Edit Mode") {
+                    isEditing.toggle()
+                    plantToAdd = nil
+                    movingPlantIndex = nil
+                    showAddSheet = false
                 }
             }
             .padding(.horizontal)
+
+            // Delete button or placeholder to hold space
+            Group {
+                if isEditing, let index = movingPlantIndex {
+                    Button("Delete Plant") {
+                        grid[index] = nil
+                        movingPlantIndex = nil
+                    }
+                    .foregroundColor(.red)
+                } else {
+                    Color.clear.frame(height: 44)
+                }
+            }
+            .padding(.top, 10)
         }
         .padding()
+        .overlay(
+            Group {
+                if showAddSheet {
+                    VStack {
+                        Spacer()
+                        VStack {
+                            PlantPicker { plant in
+                                plantToAdd = plant
+                                showAddSheet = false
+                            }
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .shadow(radius: 10)
+                            .frame(width: 250, height: 300)
+                        }
+                        .padding(.bottom, 100)
+                    }
+                    .transition(.scale)
+                }
+            }
+        )
     }
 }
 
@@ -87,7 +140,8 @@ struct PlantPicker: View {
         VStack {
             TextField("Search", text: $searchText)
                 .textFieldStyle(.roundedBorder)
-                .padding()
+                .padding(.top)
+                .padding(.horizontal)
             List(filtered, id: \.self) { name in
                 Button(name) {
                     onSelect(Plant(name: name))
@@ -95,10 +149,10 @@ struct PlantPicker: View {
             }
             .listStyle(.plain)
         }
-        .frame(width: 250, height: 300)
     }
 }
 
 #Preview {
     ContentView()
 }
+
