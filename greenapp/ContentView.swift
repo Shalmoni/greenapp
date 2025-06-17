@@ -9,124 +9,55 @@ private let plantOptions = [
     "Wheat", "Barley", "Grape", "Fig", "Pomegranate", "Olive", "Date"
 ]
 
+struct Garden: Identifiable {
+    let id = UUID()
+    var name: String = "New Garden"
+    var rows: Int
+    var columns: Int
+    var grid: [Plant?]
+    var movingPlantIndex: Int? = nil
+
+    init(name: String = "New Garden", rows: Int = 3, columns: Int = 3) {
+        self.name = name.isEmpty ? "New Garden" : name
+        self.rows = rows
+        self.columns = columns
+        self.grid = Array(repeating: nil, count: rows * columns)
+    }
+}
+
 struct ContentView: View {
-    @State private var grid: [Plant?] = Array(repeating: nil, count: 9)
+    @State private var gardens: [Garden] = [Garden()]
     @State private var isEditing = false
     @State private var showAddSheet = false
+    @State private var showAddGardenSheet = false
     @State private var plantToAdd: Plant? = nil
-    @State private var movingPlantIndex: Int? = nil
 
     var body: some View {
         ZStack {
-            VStack(spacing: 20) {
-                // Garden Grid with background and border
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 16) {
-                    ForEach(grid.indices, id: \.self) { index in
-                        ZStack {
-                            Rectangle()
-                                .fill(Color(red: 0.51, green: 0.36, blue: 0.22)) // #825C37
-                                .frame(height: 80)
-                                .overlay(
-                                    ZStack {
-                                        Rectangle()
-                                            .stroke(Color.black, lineWidth: 2) // ✅ Black border
-                                        if isEditing && grid[index] == nil && (plantToAdd != nil || movingPlantIndex != nil) {
-                                            Rectangle()
-                                                .stroke(Color.gray, style: StrokeStyle(lineWidth: 2, dash: [5]))
-                                        }
-                                    }
-                                )
+            ScrollView {
+                VStack(spacing: 40) {
+                    ForEach($gardens) { $garden in
+                        GardenView(
+                            garden: $garden,
+                            globalEditing: $isEditing,
+                            plantToAdd: $plantToAdd,
+                            showAddSheet: $showAddSheet
+                        )
+                    }
 
-                            if let plant = grid[index] {
-                                Text(plant.name)
-                                    .foregroundColor(movingPlantIndex == index ? .gray : .white)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            } else if isEditing && (plantToAdd != nil || movingPlantIndex != nil) {
-                                Image(systemName: "plus")
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .onTapGesture {
-                            guard isEditing else { return }
-
-                            if movingPlantIndex == index {
-                                movingPlantIndex = nil
-                                return
-                            }
-
-                            if let selected = movingPlantIndex, grid[index] == nil {
-                                grid[index] = grid[selected]
-                                grid[selected] = nil
-                                movingPlantIndex = nil
-                                return
-                            }
-
-                            if let newPlant = plantToAdd, grid[index] == nil {
-                                grid[index] = newPlant
-                                plantToAdd = nil
-                                return
-                            }
-
-                            if grid[index] != nil {
-                                movingPlantIndex = index
-                                plantToAdd = nil
-                            }
+                    if isEditing {
+                        Button(action: { showAddGardenSheet = true }) {
+                            Label("Add Garden", systemImage: "plus")
                         }
                     }
                 }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isEditing
-                              ? Color(red: 0.44, green: 0.78, blue: 0.38)  // #6FC662
-                              : Color(red: 0.13, green: 0.48, blue: 0.03)) // #227B08
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.black, lineWidth: 2)
-                )
-                .animation(.default, value: grid)
-
-                // Controls
-                HStack {
-                    Button("Add Plant") {
-                        showAddSheet = true
-                        isEditing = true
-                        movingPlantIndex = nil
-                    }
-                    Spacer()
-                    Button(isEditing ? "Exit Edit Mode" : "Edit Mode") {
-                        isEditing.toggle()
-                        plantToAdd = nil
-                        movingPlantIndex = nil
-                        showAddSheet = false
-                    }
-                }
-                .padding(.horizontal)
-
-                // Delete or spacer
-                Group {
-                    if isEditing, let index = movingPlantIndex {
-                        Button("Delete Plant") {
-                            grid[index] = nil
-                            movingPlantIndex = nil
-                        }
-                        .foregroundColor(.red)
-                    } else {
-                        Color.clear.frame(height: 44)
-                    }
-                }
-                .padding(.top, 10)
+                .padding()
             }
-            .padding()
 
-            // Floating modal
             if showAddSheet {
                 Color.black.opacity(0.001)
                     .ignoresSafeArea()
-                    .onTapGesture {
-                        showAddSheet = false
-                    }
+                    .onTapGesture { showAddSheet = false }
 
                 VStack {
                     PlantPicker { plant in
@@ -139,7 +70,187 @@ struct ContentView: View {
                     .frame(width: 250, height: 300)
                 }
             }
+
+            if showAddGardenSheet {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+                    .onTapGesture { showAddGardenSheet = false }
+
+                VStack {
+                    AddGardenView { name, r, c in
+                        gardens.append(Garden(name: name, rows: r, columns: c))
+                        showAddGardenSheet = false
+                    }
+                    .background(Color.white)
+                    .cornerRadius(12)
+                    .shadow(radius: 10)
+                    .frame(width: 250, height: 300)
+                }
+            }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(isEditing ? "Done" : "Edit") { isEditing.toggle() }
+            }
+        }
+    }
+}
+
+struct GardenView: View {
+    @Binding var garden: Garden
+    @Binding var globalEditing: Bool
+    @Binding var plantToAdd: Plant?
+    @Binding var showAddSheet: Bool
+
+    private let containerSize: CGFloat = 272
+    private var cellSize: CGFloat {
+        let w = (containerSize - CGFloat(garden.columns - 1) * 16) / CGFloat(garden.columns)
+        let h = (containerSize - CGFloat(garden.rows - 1) * 16) / CGFloat(garden.rows)
+        return min(w, h)
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                if globalEditing {
+                    TextField("Garden Name", text: $garden.name)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    Text(garden.name)
+                        .font(.headline)
+                }
+                Spacer()
+            }
+            .padding(.horizontal)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: garden.columns), spacing: 16) {
+                ForEach(garden.grid.indices, id: \.
+self) { index in
+                    ZStack {
+                        Rectangle()
+                            .fill(Color(red: 0.51, green: 0.36, blue: 0.22))
+                            .frame(height: cellSize)
+                            .overlay(
+                                ZStack {
+                                    Rectangle()
+                                        .stroke(Color.black, lineWidth: 2)
+                                    if globalEditing && garden.grid[index] == nil && (plantToAdd != nil || garden.movingPlantIndex != nil) {
+                                        Rectangle()
+                                            .stroke(Color.gray, style: StrokeStyle(lineWidth: 2, dash: [5]))
+                                    }
+                                }
+                            )
+
+                        if let plant = garden.grid[index] {
+                            Text(plant.name)
+                                .foregroundColor(garden.movingPlantIndex == index ? .gray : .white)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if globalEditing && (plantToAdd != nil || garden.movingPlantIndex != nil) {
+                            Image(systemName: "plus")
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .onTapGesture {
+                        guard globalEditing else { return }
+
+                        if garden.movingPlantIndex == index {
+                            garden.movingPlantIndex = nil
+                            return
+                        }
+
+                        if let selected = garden.movingPlantIndex, garden.grid[index] == nil {
+                            garden.grid[index] = garden.grid[selected]
+                            garden.grid[selected] = nil
+                            garden.movingPlantIndex = nil
+                            return
+                        }
+
+                        if let newPlant = plantToAdd, garden.grid[index] == nil {
+                            garden.grid[index] = newPlant
+                            plantToAdd = nil
+                            return
+                        }
+
+                        if garden.grid[index] != nil {
+                            garden.movingPlantIndex = index
+                            plantToAdd = nil
+                        }
+                    }
+                }
+            }
+            .frame(width: containerSize, height: containerSize)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(globalEditing
+                          ? Color(red: 0.44, green: 0.78, blue: 0.38)
+                          : Color(red: 0.13, green: 0.48, blue: 0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.black, lineWidth: 2)
+            )
+            .animation(.default, value: garden.grid)
+
+            HStack {
+                Button("Add Plant") {
+                    showAddSheet = true
+                    globalEditing = true
+                    garden.movingPlantIndex = nil
+                }
+                Spacer()
+                Button(globalEditing ? "Exit Edit Mode" : "Edit Mode") {
+                    globalEditing.toggle()
+                    plantToAdd = nil
+                    garden.movingPlantIndex = nil
+                    showAddSheet = false
+                }
+            }
+            .padding(.horizontal)
+
+            Group {
+                if globalEditing, let index = garden.movingPlantIndex {
+                    Button("Delete Plant") {
+                        garden.grid[index] = nil
+                        garden.movingPlantIndex = nil
+                    }
+                    .foregroundColor(.red)
+                } else {
+                    Color.clear.frame(height: 44)
+                }
+            }
+            .padding(.top, 10)
+        }
+    }
+}
+
+struct AddGardenView: View {
+    var onAdd: (String, Int, Int) -> Void
+    @State private var name: String = ""
+    @State private var rows: Int = 3
+    @State private var columns: Int = 3
+
+    var body: some View {
+        VStack(spacing: 20) {
+            TextField("Garden Name", text: $name)
+                .textFieldStyle(.roundedBorder)
+            Stepper(value: $rows, in: 1...9) {
+                HStack {
+                    Image(systemName: "arrow.up.and.down")
+                    Text("\(rows)")
+                }
+            }
+            Stepper(value: $columns, in: 1...9) {
+                HStack {
+                    Image(systemName: "arrow.left.and.right")
+                    Text("\(columns)")
+                }
+            }
+            Button("Add") {
+                onAdd(name.isEmpty ? "New Garden" : name, rows, columns)
+            }
+        }
+        .padding()
     }
 }
 
