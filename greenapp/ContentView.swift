@@ -3,6 +3,7 @@ import SwiftUI
 struct Plant: Identifiable, Hashable {
     let id = UUID()
     let name: String
+    let infoID: String
 }
 
 private let plantOptions = [
@@ -32,6 +33,7 @@ struct ContentView: View {
     @State private var showAddSheet = false
     @State private var showAddGardenSheet = false
     @State private var plantToAdd: Plant? = nil
+    @State private var plantInfoToShow: Plant? = nil
 
     var body: some View {
         ZStack {
@@ -43,7 +45,8 @@ struct ContentView: View {
                             globalEditing: $isEditing,
                             plantToAdd: $plantToAdd,
                             showAddSheet: $showAddSheet,
-                            showAddGardenSheet: $showAddGardenSheet
+                            showAddGardenSheet: $showAddGardenSheet,
+                            plantInfoToShow: $plantInfoToShow
                         )
                         .tag(index)
                         .padding(.horizontal, 1)
@@ -86,6 +89,20 @@ struct ContentView: View {
                     .frame(width: 250, height: 300)
                 }
             }
+
+            if let plant = plantInfoToShow {
+                Color.black.opacity(0.001).ignoresSafeArea().onTapGesture {
+                    plantInfoToShow = nil
+                }
+
+                VStack {
+                    PlantInfoCard(plant: plant)
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .shadow(radius: 10)
+                        .frame(width: 260, height: 320)
+                }
+            }
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -103,6 +120,7 @@ struct GardenView: View {
     @Binding var plantToAdd: Plant?
     @Binding var showAddSheet: Bool
     @Binding var showAddGardenSheet: Bool
+    @Binding var plantInfoToShow: Plant?
 
     private let minCellSize: CGFloat = 40
 
@@ -178,29 +196,33 @@ struct GardenView: View {
                                 }
                             }
                             .onTapGesture {
-                                guard globalEditing else { return }
+                                if globalEditing {
+                                    if garden.movingPlantIndex == index {
+                                        garden.movingPlantIndex = nil
+                                        return
+                                    }
 
-                                if garden.movingPlantIndex == index {
-                                    garden.movingPlantIndex = nil
-                                    return
-                                }
+                                    if let selected = garden.movingPlantIndex, garden.grid[index] == nil {
+                                        garden.grid[index] = garden.grid[selected]
+                                        garden.grid[selected] = nil
+                                        garden.movingPlantIndex = nil
+                                        return
+                                    }
 
-                                if let selected = garden.movingPlantIndex, garden.grid[index] == nil {
-                                    garden.grid[index] = garden.grid[selected]
-                                    garden.grid[selected] = nil
-                                    garden.movingPlantIndex = nil
-                                    return
-                                }
+                                    if let newPlant = plantToAdd, garden.grid[index] == nil {
+                                        garden.grid[index] = newPlant
+                                        plantToAdd = nil
+                                        return
+                                    }
 
-                                if let newPlant = plantToAdd, garden.grid[index] == nil {
-                                    garden.grid[index] = newPlant
-                                    plantToAdd = nil
-                                    return
-                                }
-
-                                if garden.grid[index] != nil {
-                                    garden.movingPlantIndex = index
-                                    plantToAdd = nil
+                                    if garden.grid[index] != nil {
+                                        garden.movingPlantIndex = index
+                                        plantToAdd = nil
+                                    }
+                                } else {
+                                    if let plant = garden.grid[index] {
+                                        plantInfoToShow = plant
+                                    }
                                 }
                             }
                         }
@@ -291,10 +313,34 @@ struct PlantPicker: View {
 
             List(filtered, id: \.self) { name in
                 Button(name) {
-                    onSelect(Plant(name: name))
+                    let id = name.replacingOccurrences(of: " ", with: "").lowercased()
+                    onSelect(Plant(name: name, infoID: id))
                 }
             }
             .listStyle(.plain)
+        }
+    }
+}
+
+struct PlantInfoCard: View {
+    let plant: Plant
+
+    var body: some View {
+        let info = PlantInfoManager.shared.info(for: plant.infoID)
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(info?.name ?? plant.name)
+                    .font(.headline)
+                if let desc = info?.description {
+                    Text(desc)
+                        .font(.body)
+                }
+                Text("ID: \(info?.id ?? plant.infoID)")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding()
         }
     }
 }
