@@ -20,7 +20,7 @@ class PlantInfoManager {
             return
         }
 
-        guard let content = try? String(contentsOf: url) else {
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
             print("Failed to read PlantInfo.csv")
             return
         }
