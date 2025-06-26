@@ -1,9 +1,8 @@
-id,name,description
-wheat,Wheat,Wheat is a cereal grain.
-barley,Barley,Barley is commonly used for animal feed.
-grape,Grape,Grapes grow on vines.
-fig1,Fig,First fig tree.
-fig2,Fig,Second fig tree.
-pomegranate,Pomegranate,A fruit-bearing shrub.
-olive,Olive,Olive tree used for oil.
-date,Date,Date palm that produces dates.
+id,name,sciname,originarea,family,lightrec,temprec,waterrec,apb,seed2sling,sling2growth,growth2flower,flower2dedo,dedo2growth
+wheat,Wheat,Triticum aestivum,Fertile Crescent,Grass family,Full sun,10–24°C,Every 7 days,annual,5,12,40,30,
+barley,Barley,Hordeum vulgare,Fertile Crescent,Grass family,Full sun,10–24°C,Every 7 days,annual,5,10,35,30,
+grape,Grape,Vitis vinifera,Caucasus,Grape family,Full sun,15–30°C,Every 7–10 days,perennial,7,14,60,90,60.0
+fig,Fig,Ficus carica,Levant,Mulberry family,Full sun,15–30°C,Every 7–10 days,perennial,10,20,40,60,60.0
+pomegranate,Pomegranate,Punica granatum,Iran to N. India,Loosestrife family,Full sun,20–35°C,Every 10–14 days,perennial,10,20,60,60,60.0
+olive,Olive,Olea europaea,Eastern Mediterranean,Olive family,Full sun,15–30°C,Every 10–14 days,perennial,15,25,90,90,90.0
+date,Date,Phoenix dactylifera,Mesopotamia,Palm family,Full sun,25–40°C,Every 14 days,perennial,20,30,100,120,90.0

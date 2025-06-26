@@ -34,6 +34,7 @@ struct ContentView: View {
     @State private var showAddGardenSheet = false
     @State private var plantToAdd: Plant? = nil
     @State private var plantInfoToShow: Plant? = nil
+    @State private var lockedDetent = PresentationDetent.fraction(0.5) //
     
     var body: some View {
         ZStack {
@@ -93,8 +94,8 @@ struct ContentView: View {
         // ✅ Attach it here — to the entire ZStack
         .sheet(item: $plantInfoToShow) { plant in
             PlantInfoCard(plant: plant)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .presentationDetents([.fraction(0.5)], selection: $lockedDetent)
+                .presentationDragIndicator(.hidden)
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -314,27 +315,49 @@ struct ContentView: View {
     
     struct PlantInfoCard: View {
         let plant: Plant
-        
+
         var body: some View {
             let info = PlantInfoManager.shared.info(for: plant.infoID)
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(info?.name ?? plant.name)
-                        .font(.title2)
-                        .bold()
-                    if let desc = info?.description {
-                        Text(desc)
-                            .font(.body)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(info?.name ?? plant.name)
+                    .font(.title2)
+                    .bold()
+                if let info = info {
+                    Group {
+                        Text("Scientific name: \(info.sciname)")
+                        Text("Origin area: \(info.originarea)")
+                        Text("Family: \(info.family)")
+                        Text("Light: \(info.lightrec)")
+                        Text("Temperature: \(info.temprec)")
+                        Text("Water: \(info.waterrec)")
+                        Text("Annual/Perennial/Biennial: \(info.apb)")
                     }
-                    Text("ID: \(info?.id ?? plant.infoID)")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    .font(.body)
+
+                    Divider()
+
+                    Group {
+                        Text("Seed → Seedling: \(info.seed2sling) days")
+                        Text("Seedling → Growth: \(info.sling2growth) days")
+                        Text("Growth → Flower: \(info.growth2flower) days")
+                        
+                        Text("Flower → \(info.apb.lowercased() == "perennial" ? "Dormant" : "Death"): \(info.flower2dedo) days")
+                        
+                        if info.apb.lowercased() == "perennial" {
+                            Text("Dormant → Growth: \(info.dedo2growth) days")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundColor(.gray)
                 }
-                .padding()
+
+                Text("ID: \(info?.id ?? plant.infoID)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
+            .padding()
         }
-        
     }
 }
 struct ContentView_Previews: PreviewProvider {
